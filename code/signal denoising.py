@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 # 读取 EEG 数据
 raw_data = mne.io.read_raw_edf('../PSG/ST7011J0-PSG.edf', preload=True)
 
-# 选择指定通道（确保通道名称正确）
+# 选择指定通道(EEG Fpz-Cz,脑电从Fpz(鼻根处)到Cz(头顶)的信号)
 selected_channel = 'EEG Fpz-Cz'
 raw_data.pick_channels([selected_channel])  # 仅保留目标通道
 
@@ -19,13 +19,13 @@ scaling_factor = amplitude_range / 2
 
 # 打印缩放信息
 print(f"EEG 数据范围: [{min_val:.6f}, {max_val:.6f}], 幅度范围: {amplitude_range:.6f}")
-print(f"计算出的 scalings 值: {scaling_factor:.6f}")
+print(f"缩放系数值: {scaling_factor:.6f}")
 
 # 绘制原始 EEG 数据
 raw_data.plot(
     duration=raw_data.times[-1],  # 设置绘图时长为整个数据的持续时间
     n_channels=1,
-    scalings=dict(eeg=scaling_factor),  # 使用动态计算的 scalings
+    scalings=dict(eeg=scaling_factor),  # 使用动态计算的缩放系数值
     title=f'Raw EEG Data - {selected_channel}'
 )
 
@@ -42,6 +42,7 @@ raw_filtered.filter(l_freq=0.5, h_freq=40)
 filtered_data, _ = raw_filtered[:]
 min_val_f, max_val_f = np.min(filtered_data), np.max(filtered_data)
 amplitude_range_f = max_val_f - min_val_f
+
 # 经过滤波后的数据范围缩小,因此可以设置为 最大-最小幅度的3倍
 scaling_factor_f = amplitude_range_f / 3
 
@@ -49,7 +50,7 @@ scaling_factor_f = amplitude_range_f / 3
 raw_filtered.plot(
     duration=raw_filtered.times[-1],
     n_channels=1,
-    scalings=dict(eeg=scaling_factor_f),  # 使用滤波后的动态 scalings
+    scalings=dict(eeg=scaling_factor_f),  # 使用动态计算的缩放系数值
     title=f'Filtered EEG Data - {selected_channel}'
 )
 
