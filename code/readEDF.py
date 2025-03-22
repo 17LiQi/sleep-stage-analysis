@@ -24,7 +24,8 @@ n_channels = edf_file.signals_in_file
 for ch in range(n_channels):
     ch_label = edf_file.getLabel(ch)
     prefilter = edf_file.getPrefilter(ch)
-    print(f"Channel {ch_label}: {prefilter}")
+    sample_frequency = edf_file.getSampleFrequency(ch)
+    print(f"Channel {ch_label}: Prefilter: {prefilter}, Sample Frequency: {sample_frequency} Hz")
 
 # 但mne.io.read_raw_edf函数将所有高通滤器都设置为0.0 Hz 与实际的高通滤波器设置不同,可能对模型训练有影响,考虑后期手动设置高通滤波器
 

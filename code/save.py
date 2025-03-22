@@ -1,3 +1,5 @@
+import os
+import torch
 import numpy as np
 import mne
 
@@ -10,48 +12,56 @@ def preprocess_and_segment_EEG(file_path, save_path, window_sec=30):
     selected_channel = 'EEG Fpz-Cz'
     raw_data.pick_channels([selected_channel])
 
-    # 预处理流程
-    raw_filtered = raw_data.copy()
-
-    # 1. 应用49Hz陷波滤波器
-    raw_filtered.notch_filter(freqs=49)
-
-    # 2. 应用0.5-40Hz带通滤波
-    raw_filtered.filter(l_freq=0.5, h_freq=40)
-
+    """简单预处理"""
+    raw_filtered = raw_data.copy()  # 复制数据进行滤波
+    raw_filtered.notch_filter(freqs=49)  # 应用 49Hz 陷波滤波器
+    raw_filtered.filter(l_freq=0.5, h_freq=40)  # 应用 0.5-40Hz 带通滤波
     # 获取预处理后的数据
     filtered_data, times = raw_filtered[:]
 
-    # 数据分割参数
-    sfreq = int(raw_filtered.info['sfreq'])  # 获取采样率
-    window_samples = window_sec * sfreq  # 每个窗口的样本数
+    """*********"""
 
-    # 计算可分割的完整窗口数量
+    sfreq = int(raw_filtered.info['sfreq'])
+    window_samples = sfreq * window_sec
+    filtered_data, _ = raw_filtered[:, :]
+
+    # 数据分割
     n_samples = filtered_data.shape[1]
     n_windows = n_samples // window_samples
-
-    # 截断数据至完整窗口数
     truncated_samples = n_windows * window_samples
-    truncated_data = filtered_data[:, :truncated_samples]
 
-    # 分割为30秒窗口 (形状：n_windows, 1通道, 时间点)
-    segmented_data = truncated_data.reshape(1, n_windows, window_samples).transpose(1, 0, 2)
+    # 转换为PyTorch Tensor
+    data = raw_filtered.get_data()[0, :n_windows * window_samples]  # 获取单通道数据
+    tensor_data = torch.FloatTensor(data.reshape(n_windows, window_samples))
 
-    # 保存处理后的数据
-    np.save(save_path, {
-        'data': segmented_data,
-        'sfreq': sfreq,
-        'window_sec': window_sec,
-        'channels': [selected_channel],
-        'timestamps': times[:truncated_samples].reshape(n_windows, window_samples)
-    })
+    # 保存（Tensor + 元数据）
+    torch.save({
+        'eeg_data': tensor_data.unsqueeze(1),  # 添加通道维度 (n, 1, 3000)
+        'metadata': {
+            'sfreq': sfreq,
+            'window_sec': window_sec,
+            'channels': ['EEG Fpz-Cz']
+        }
+    }, save_path)
 
-    print(f"预处理完成，保存了{n_windows}个{window_sec}秒片段")
-    return segmented_data
+    print(f"Saved {n_windows} segments to {save_path}")
 
 
-# 使用示例
-processed_data = preprocess_and_segment_EEG(
-    file_path='../PSG/ST7011J0-PSG.edf',
-    save_path='processed_eeg_data.npy'
-)
+def process_files(input_dir, output_dir, window_sec=30):
+    os.makedirs(output_dir, exist_ok=True)
+
+    for filename in os.listdir(input_dir):
+        if filename.endswith('.edf'):
+            input_path = os.path.join(input_dir, filename)
+            output_name = os.path.splitext(filename)[0] + '.pt'
+            output_path = os.path.join(output_dir, output_name)
+
+            try:
+                preprocess_and_segment_EEG(input_path, output_path, window_sec)
+            except Exception as e:
+                print(f"Error processing {filename}: {e}")
+
+
+input_directory = '../PSG'
+output_directory = '../processed_eeg_data'
+process_files(input_directory, output_directory)

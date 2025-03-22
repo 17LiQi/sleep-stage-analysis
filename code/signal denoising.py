@@ -9,7 +9,7 @@ raw_data = mne.io.read_raw_edf('../PSG/ST7011J0-PSG.edf', preload=True)
 selected_channel = 'EEG Fpz-Cz'
 raw_data.pick_channels([selected_channel])  # 仅保留目标通道
 
-# 获取 EEG 数据值
+# 获取 EEG 数据值(用于绘制)
 data, _ = raw_data[:]
 min_val, max_val = np.min(data), np.max(data)
 amplitude_range = max_val - min_val  # 计算最大-最小幅度范围
