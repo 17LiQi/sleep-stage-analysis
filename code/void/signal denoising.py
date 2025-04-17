@@ -3,7 +3,7 @@ import mne
 import matplotlib.pyplot as plt
 
 # 读取 EEG 数据
-raw_data = mne.io.read_raw_edf('../PSG/ST7011J0-PSG.edf', preload=True)
+raw_data = mne.io.read_raw_edf('../../PSG/ST7011J0-PSG.edf', preload=True)
 
 # 选择指定通道(EEG Fpz-Cz,脑电从Fpz(鼻根处)到Cz(头顶)的信号)
 selected_channel = 'EEG Fpz-Cz'

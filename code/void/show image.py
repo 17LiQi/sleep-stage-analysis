@@ -31,7 +31,7 @@ def plot_edf_channels(file_path):
 
         plt.show()
 
-edf_file_path = r"../PSG/ST7011J0-PSG.edf"
+edf_file_path = r"../../PSG/ST7011J0-PSG.edf"
 
 # 执行绘图
 plot_edf_channels(edf_file_path)

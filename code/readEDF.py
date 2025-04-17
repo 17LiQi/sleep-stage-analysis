@@ -29,4 +29,7 @@ for ch in range(n_channels):
 
 # 但mne.io.read_raw_edf函数将所有高通滤器都设置为0.0 Hz 与实际的高通滤波器设置不同,可能对模型训练有影响,考虑后期手动设置高通滤波器
 
+start_datetime = edf_file.getStartdatetime()
+print(f"Recording start time:{edf_file.getStartdatetime()}")
+
 edf_file.close()
