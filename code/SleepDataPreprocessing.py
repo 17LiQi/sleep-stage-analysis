@@ -97,6 +97,20 @@ class EEGProcessor:
             print(f"分段: 窗口长度 {seg_len} 样本 ({SleepConfig.WINDOW_SEC} 秒), 段数 {n_seg}")
             segments = data[0, :n_seg * seg_len].reshape(n_seg, seg_len)  # 形状: (n_seg, seg_len)
 
+            print("应用标准化...")
+            segments = (segments - np.mean(segments, axis=1, keepdims=True)) / np.std(segments, axis=1, keepdims=True)
+            segments = np.clip(segments, -5, 5)  # 防止异常值
+
+            # 添加通道信息验证
+            if SleepConfig.TARGET_CHANNEL not in raw.ch_names:
+                available = '\n'.join(raw.ch_names)
+                raise ValueError(f"目标通道 {SleepConfig.TARGET_CHANNEL} 不存在！可用通道：\n{available}")
+
+            # 添加标签验证
+            unique_labels = np.unique(seg_labels.numpy())
+            if len(unique_labels) < 2:
+                raise ValueError(f"文件 {edf_path} 仅包含单一标签: {unique_labels}")
+
             # 转换为张量
             segments = torch.tensor(segments, dtype=torch.float32).unsqueeze(1)  # 形状: (n_seg, 1, seg_len)
             print(f"分段后数据形状: {segments.shape}, 标签形状: {seg_labels.shape}")

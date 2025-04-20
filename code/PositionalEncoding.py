@@ -1,5 +1,5 @@
 import numpy as np
-from d2l import torch
+import torch
 from torch import nn
 
 

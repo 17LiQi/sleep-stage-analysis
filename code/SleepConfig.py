@@ -2,6 +2,7 @@ class SleepConfig:
     RAW_EEG_PATH = '../PSG'
     LABEL_PATH = '../tag'
     PROCESSED_EEG_PATH = '../processed_eeg_data'
+    OUTPUTRESULT_PATH = '../output_results'
 
     TARGET_CHANNEL = 'EEG Fpz-Cz'
     WINDOW_SEC = 30

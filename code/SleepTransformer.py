@@ -1,4 +1,4 @@
-from d2l.torch import PositionalEncoding
+from torch import PositionalEncoding
 from torch import nn
 
 
