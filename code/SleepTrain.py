@@ -133,10 +133,10 @@ class Trainer:
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-                if epoch == 0 and not self.logged_sample:  # 首次epoch打印输入示例
+                if epoch == 0 and not self.logged_samples:  # 首次epoch打印输入示例
                     pbar.set_postfix({'status': 'logging data sample'})
                     self._log_data_sample((eeg, labels))
-                    self.logged_sample = True
+                    self.logged_samples = True
 
                 batch_time = time.time() - start_time
                 batch_times.append(batch_time)

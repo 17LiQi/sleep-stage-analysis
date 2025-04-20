@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="cy@10.22.62.75:22 password (2)" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="cy@10.22.62.75:22" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
       <paths name="CQUTWorkstation">
         <serverdata>
@@ -10,20 +10,6 @@
         </serverdata>
       </paths>
       <paths name="cy@10.22.62.75:22">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/tmp/pycharm_project_506" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="cy@10.22.62.75:22 password">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/tmp/pycharm_project_506" local="$PROJECT_DIR$" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="cy@10.22.62.75:22 password (2)">
         <serverdata>
           <mappings>
             <mapping deploy="/tmp/pycharm_project_506" local="$PROJECT_DIR$" />

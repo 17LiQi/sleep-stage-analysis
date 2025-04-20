@@ -1,5 +1,6 @@
 class SleepConfig:
     RAW_EEG_PATH = '../PSG'
+    RAW_LABEL_PATH = '../Hypnogram'
     LABEL_PATH = '../tag'
     PROCESSED_EEG_PATH = '../processed_eeg_data'
     OUTPUTRESULT_PATH = '../output_results'

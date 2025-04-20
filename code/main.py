@@ -3,7 +3,7 @@ import os
 
 from SleepConfig import SleepConfig
 from SleepDataPreprocessing import EEGProcessor
-from SleepDataset import SleepDataset, create_data_loaders_by_file
+from SleepDataset import create_data_loaders_by_file
 from SleepNet import SleepNet
 from SleepTrain import Trainer
 
