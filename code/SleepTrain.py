@@ -1,6 +1,5 @@
 import os
 import time
-
 import numpy as np
 import torch
 from sklearn.metrics import cohen_kappa_score, classification_report, confusion_matrix
@@ -8,10 +7,27 @@ from sklearn.utils.class_weight import compute_class_weight
 import seaborn as sns
 import matplotlib.pyplot as plt
 import umap
-# from torch._dynamo.logging import pbar
+from torch.amp import autocast, GradScaler
 from tqdm import tqdm
 
-from FocalLoss import FocalLoss
+
+class FocalLoss(torch.nn.Module):
+    """ Focal Loss 实现 """
+
+    def __init__(self, weight=None, gamma=3.0, alpha=None):
+        super().__init__()
+        self.weight = weight
+        self.gamma = gamma
+        self.alpha = alpha  # 新增 alpha 参数
+
+    def forward(self, input, target):
+        ce_loss = torch.nn.functional.cross_entropy(input, target, reduction='none')
+        pt = torch.exp(-ce_loss)
+        focal_loss = (1 - pt) ** self.gamma * ce_loss
+        if self.alpha is not None:
+            alpha_t = self.alpha[target]  # 根据目标类别选择对应的 alpha 值
+            focal_loss = alpha_t * focal_loss
+        return focal_loss.mean()
 
 
 class Trainer:
@@ -23,24 +39,20 @@ class Trainer:
         self.test_loader = test_loader
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model = self.model.to(self.device)
-        self.setup_training()
-
         self.train_losses = []
         self.train_accs = []
         self.val_losses = []
         self.val_kappas = []
         self.best_epoch = 0
         self.class_distribution = self._analyze_class_distribution()
-        self.setup_training()
         self.logged_samples = False
-
         self.batch_times = []
         self.epoch_times = []
         self.eval_times = []
+        self.setup_training()
 
     def _analyze_class_distribution(self):
         """分析各数据集的类别分布"""
-
         def get_dist(loader):
             labels = []
             for _, lbls in loader:
@@ -54,6 +66,7 @@ class Trainer:
         }
 
     def setup_training(self):
+
         # 增强类别权重计算
         all_labels = []
         for _, labels in self.train_loader:
@@ -72,131 +85,111 @@ class Trainer:
         class_weights = np.clip(class_weights, 0.1, 10)  # 限制权重范围
         print(f"类别权重: {class_weights}")
 
-        # 使用Focal Loss
+        # 使用 Focal Loss，设置 alpha 参数
         self.criterion = FocalLoss(
             weight=torch.FloatTensor(class_weights).to(self.device),
-            gamma=2.0
+            gamma=2.0,
+            alpha=torch.FloatTensor(class_weights).to(self.device)  # 将 alpha 设置为与 weight 相同
         )
 
-        # 优化器添加动量
+        # 优化器添加动量和正则化
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
             lr=self.config.LEARNING_RATE,
-            weight_decay=0.01,
+            weight_decay=1e-4,  # Added weight decay for regularization
             betas=(0.9, 0.999)
         )
 
+        # 使用学习率调度器
         self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             self.optimizer,
-            mode='max',
+            mode='max',  # Maximize validation Kappa
             factor=0.1,
             patience=5
         )
 
-        self.scaler = torch.amp.GradScaler('cuda')
+        self.scaler = GradScaler()
 
-        def extract_features(self, x):
-            if x.dim() == 2:
-                x = x.unsqueeze(1)
-            x = self.features(x)
-            x = x.permute(0, 2, 1)
-            x, _ = self.lstm(x)
-            return x  # Return LSTM output before classifier
-
-    def train_epoch(self, loader, epoch):
+    def train_epoch(self, train_loader, epoch):
         self.model.train()
         total_loss = 0
         correct = 0
         total = 0
-        batch_times = []
+        start_time = time.time()
 
-        with tqdm(loader, desc=f"Epoch {epoch + 1}/{self.config.NUM_EPOCHS}[Train]", unit="batch",leave=False)as pbar:
-            for batch_idx, (eeg, labels) in enumerate(pbar):
-                start_time = time.time()
+        print(f"Epoch {epoch} 开始训练...")
 
+        for batch_idx, (eeg, labels) in enumerate(train_loader):
+            eeg, labels = eeg.to(self.device), labels.to(self.device)
+
+            self.optimizer.zero_grad()
+            with autocast("cuda"):
+                outputs = self.model(eeg)
+                loss = self.criterion(outputs, labels)
+
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
+
+            total_loss += loss.item()
+            _, predicted = torch.max(outputs, 1)
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+            # 每隔 N 个 batch 打印一次
+            if (batch_idx + 1) % 50 == 0 or (batch_idx + 1) == len(train_loader):
+                avg_loss = total_loss / (batch_idx + 1)
+                acc = correct / total
+                print(f"  Batch {batch_idx + 1}/{len(train_loader)} - Loss: {avg_loss:.4f} - Acc: {acc:.4f}")
+
+        train_time = time.time() - start_time
+        avg_loss = total_loss / len(train_loader)
+        acc = correct / total
+
+        print(f"Epoch {epoch} 训练完毕: 平均损失={avg_loss:.4f}, 准确率={acc:.4f}, 用时={train_time:.2f}s")
+
+        self.train_losses.append(avg_loss)
+        return avg_loss, acc
+
+    def evaluate(self, val_loader, epoch):
+        self.model.eval()
+        total_loss = 0
+        correct = 0
+        total = 0
+        start_time = time.time()
+
+        print()
+        print(f"Epoch {epoch} 验证中...")
+
+        with torch.no_grad():
+            for batch_idx, (eeg, labels) in enumerate(val_loader):
                 eeg, labels = eeg.to(self.device), labels.to(self.device)
-                self.optimizer.zero_grad(set_to_none=True)
 
-                # 使用混合精度训练
-                with torch.amp.autocast(device_type='cuda'):
+                with autocast("cuda"):
                     outputs = self.model(eeg)
                     loss = self.criterion(outputs, labels)
-                    if epoch == 0:
-                        print(f"output dtype: {outputs.dtype}, labels dtype: {labels.dtype}")
-
-                self.scaler.scale(loss).backward()
-                self.scaler.step(self.optimizer)
-                self.scaler.update()
 
                 total_loss += loss.item()
                 _, predicted = torch.max(outputs, 1)
                 total += labels.size(0)
                 correct += (predicted == labels).sum().item()
 
-                if epoch == 0 and not self.logged_samples:  # 首次epoch打印输入示例
-                    pbar.set_postfix({'status': 'logging data sample'})
-                    self._log_data_sample((eeg, labels))
-                    self.logged_samples = True
+                if (batch_idx + 1) % 20 == 0 or (batch_idx + 1) == len(val_loader):
+                    avg_loss = total_loss / (batch_idx + 1)
+                    acc = correct / total
+                    print(f"  Val Batch {batch_idx + 1}/{len(val_loader)} - Loss: {avg_loss:.4f} - Acc: {acc:.4f}")
 
-                batch_time = time.time() - start_time
-                batch_times.append(batch_time)
+        val_time = time.time() - start_time
+        avg_loss = total_loss / len(val_loader)
+        acc = correct / total
 
-                pbar.set_postfix({
-                    'loss': f"{total_loss / (batch_idx + 1):.4f}",
-                    'acc': f"{correct / total:.4f}",
-                    'batch_time': f"{batch_time:.3f}s"
-                })
+        print(f"Epoch {epoch} 验证完毕: 平均损失={avg_loss:.4f}, 准确率={acc:.4f}, 用时={val_time:.2f}s")
 
-        if epoch == 0:
-            print(f"First batch - Output dtype: {outputs.dtype}, Loss dtype: {loss.dtype}")
-
-        self.batch_times.extend(batch_times)
-        return total_loss / len(loader), correct / total
-
-    def evaluate(self, loader, dataset_name="Validation"):
-        self.model.eval()
-        total_loss = 0
-        correct = 0
-        total = 0
-        all_preds = []
-        all_labels = []
-        start_time = time.time()
-
-        with tqdm(loader, desc=f"{dataset_name}", unit="batch") as pbar:
-            with torch.no_grad():
-                for eeg, labels in loader:
-                    eeg, labels = eeg.to(self.device), labels.to(self.device)
-                    with torch.amp.autocast(device_type='cuda'):
-                        outputs = self.model(eeg)
-                        loss = self.criterion(outputs, labels)
-                    total_loss += loss.item()
-                    _, predicted = torch.max(outputs, 1)
-                    total += labels.size(0)
-                    correct += (predicted == labels).sum().item()
-                    all_preds.extend(predicted.cpu().numpy())
-                    all_labels.extend(labels.cpu().numpy())
-                    pbar.set_postfix({'loss': f"{total_loss / (pbar.n + 1):.4f}", 'acc': f"{correct / total:.4f}"})
-
-        avg_loss = total_loss / len(loader)
-        kappa = cohen_kappa_score(all_labels, all_preds)
-
-        eval_time = time.time() - start_time
-        self.eval_times.append((dataset_name, eval_time))
-
-        print(f"{dataset_name} 评估: ")
-        print(classification_report(all_labels, all_preds, 
-                                  target_names=['Wake', 'N1', 'N2', 'N3', 'REM']))
-        print(f"{dataset_name} Cohen's Kappa: {kappa:.3f}")
-        print(f"{dataset_name} 平均损失: {avg_loss:.4f}")
-        print(f"{dataset_name} 评估时间: {eval_time:.3f}s")
-
-        self.plot_confusion_matrix(all_labels, all_preds, dataset_name)
-        
-        return kappa, avg_loss
+        self.val_losses.append(avg_loss)
+        return avg_loss, acc
 
     def plot_confusion_matrix(self, y_true, y_pred, dataset_name):
         cm = confusion_matrix(y_true, y_pred)
-
 
         plt.figure(figsize=(8, 6))
         sns.heatmap(
@@ -236,6 +229,7 @@ class Trainer:
 
         plt.savefig(os.path.join(self.config.OUTPUTRESULT_PATH, 'training_curves.png'))
         plt.close()
+        print(f"训练曲线已保存到: {os.path.join(self.config.OUTPUTRESULT_PATH, 'training_curves.png')}")
 
     def analyze_class_performance(self):
         """分析各类别表现"""
@@ -248,12 +242,10 @@ class Trainer:
         sample_weights = np.array([self.criterion.weight.cpu().numpy()[l] for l in np.arange(5)])
         print(f"\n样本权重影响: {sample_weights}")
 
-        # 梯度分析（示例）
+        # 梯度分析
         for name, param in self.model.named_parameters():
             if param.grad is not None:
                 print(f"参数 {name} 梯度均值: {param.grad.abs().mean().item():.4e}")
-
-
 
     def _log_data_sample(self, batch):
         """记录输入数据样本"""
@@ -264,20 +256,15 @@ class Trainer:
         print(f"形状: {sample.shape}")
         print(f"数值范围: {sample.min():.3f} ~ {sample.max():.3f}")
         print(f"均值: {sample.mean():.3f} ± {sample.std():.3f}")
-        # plt.plot(sample.squeeze())
-        # plt.title(f"示例波形 (标签: {labels[0].item()})")
-        # plt.savefig(os.path.join(self.config.PROCESSED_EEG_PATH, 'sample_waveform.png'))
-        # plt.close()
 
-    # 在训练后添加可视化
     def visualize_features(self, loader):
         self.model.eval()
         features, labels = [], []
-        with tqdm(loader, desc="Visualizing Features", unit="batch") as pbar:
+        with tqdm(loader, desc="Visualizing Features", unit="batch", leave=True) as pbar:
             with torch.no_grad():
-                for x, y in loader:
+                for x, y in pbar:
                     x, y = x.to(self.device), y.to(self.device)
-                    with torch.amp.autocast(device_type='cuda'):
+                    with autocast("cuda"):
                         feats = self.model.extract_features(x).mean(dim=1)  # 全局平均
                     features.append(feats.cpu())
                     labels.append(y.cpu())
@@ -285,11 +272,14 @@ class Trainer:
         embeddings = umap.UMAP().fit_transform(torch.cat(features))
         plt.scatter(embeddings[:, 0], embeddings[:, 1], c=torch.cat(labels), alpha=0.6)
         plt.savefig(os.path.join(self.config.OUTPUTRESULT_PATH, 'feature_embedding.png'))
+        plt.close()
+        print(f"特征嵌入可视化已保存到: {os.path.join(self.config.OUTPUTRESULT_PATH, 'feature_embedding.png')}")
 
     def train(self):
         best_kappa = 0
         patience = 0
 
+        print("=== 开始模型训练 ===")
         with tqdm(range(self.config.NUM_EPOCHS), desc="Training", unit="epoch") as epoch_bar:
             for epoch in epoch_bar:
                 start_time = time.time()
@@ -303,21 +293,22 @@ class Trainer:
                 self.val_kappas.append(val_kappa)
                 self.scheduler.step(val_kappa)
 
+                # 早停
                 if val_kappa > best_kappa:
                     best_kappa = val_kappa
                     self.best_epoch = epoch + 1
-                    torch.save(self.model.state_dict(), '../output_results/best_model.pth')
+                    torch.save(self.model.state_dict(), os.path.join(self.config.OUTPUTRESULT_PATH, 'best_model.pth'))
                     patience = 0
                 else:
                     patience += 1
-                    if patience > 10:
+                    if patience > 5:
                         print("Early stopping!")
                         break
 
                 epoch_time = time.time() - start_time
                 self.epoch_times.append(epoch_time)
 
-                print(f'Epoch {epoch+1}/{self.config.NUM_EPOCHS}')
+                print(f'Epoch {epoch + 1}/{self.config.NUM_EPOCHS}')
                 print(f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.4f}')
                 print(f'Val Kappa: {val_kappa:.4f}, Val Loss: {val_loss:.4f}')
                 print(f'Epoch 耗时: {epoch_time:.3f}秒')
