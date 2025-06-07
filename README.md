@@ -1,6 +1,6 @@
-# 睡觉阶段分析
+# 睡眠阶段分析
 ## 项目基本信息
-- 数据集: Sleep-EDF-Expanded v1.0.0
+- 数据集: Sleep-EDF-Expanded v1.0.0(Sleep-EDF-153 Sleep Cassette Study and Data 和 Sleep-EDF-44 Sleep Telemetry Study and Data)
 - 核心框架: python3.10.x , pytorch cuda 12.1
 - 环境: ubuntu20.04
 - 性能: 3x RTX A4500
