@@ -43,6 +43,10 @@ class DataConfig:
     dataset_path: str = "/tmp/pycharm_project_506/physionet.org/files/sleep-edfx/1.0.0/sleep-cassette"
     num_subjects: int = 20
     
+    # K折交叉验证参数
+    n_splits: int = 5  # K折数
+    current_fold: int = 0  # 当前折数
+    
     # 文件命名规则
     psg_file_pattern: str = "SC{subject_id}E0-PSG.edf"
     hypnogram_file_pattern: str = "SC{subject_id}E{type}-Hypnogram.edf"

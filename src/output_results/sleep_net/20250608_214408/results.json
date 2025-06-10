@@ -1,0 +1,46 @@
+{
+    "model_name": "sleep_net",
+    "mean_val_acc": 94.34291354059079,
+    "mean_val_f1": 0.8097173335978651,
+    "mean_val_kappa": 0.8870823898615189,
+    "fold_results": [
+        {
+            "fold": 1,
+            "best_val_acc": 94.22935779816514,
+            "best_val_f1": 0.8077187126900535,
+            "best_val_kappa": 0.8841368490144002
+        },
+        {
+            "fold": 2,
+            "best_val_acc": 94.20183486238533,
+            "best_val_f1": 0.8135545354004676,
+            "best_val_kappa": 0.8856219001186368
+        },
+        {
+            "fold": 3,
+            "best_val_acc": 94.4954128440367,
+            "best_val_f1": 0.8114155094593853,
+            "best_val_kappa": 0.8895199354012588
+        },
+        {
+            "fold": 4,
+            "best_val_acc": 94.74263693916873,
+            "best_val_f1": 0.8143228059239455,
+            "best_val_kappa": 0.8947286365088634
+        },
+        {
+            "fold": 5,
+            "best_val_acc": 94.0453252591981,
+            "best_val_f1": 0.8015751045154736,
+            "best_val_kappa": 0.8814046282644363
+        }
+    ],
+    "label_mapping": {
+        "Sleep stage W": 0,
+        "Sleep stage 1": 1,
+        "Sleep stage 2": 2,
+        "Sleep stage 3": 3,
+        "Sleep stage 4": 3,
+        "Sleep stage R": 4
+    }
+}

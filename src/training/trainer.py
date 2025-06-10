@@ -9,10 +9,17 @@ import json
 from datetime import datetime
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.metrics import confusion_matrix
+from sklearn.metrics import confusion_matrix, classification_report, f1_score, precision_score, recall_score
 import pandas as pd
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
+
+@dataclass
+class DataConfig:
+    ...
+    n_splits: int = 5  # K折
+    ...
 
 class Trainer:
     def __init__(self, model, config):
@@ -34,26 +41,14 @@ class Trainer:
             'val_loss': [],
             'train_acc': [],
             'val_acc': [],
-            'best_val_acc': 0
+            'best_val_acc': 0,
+            'val_f1': [],
+            'val_kappa': []
         }
         
-        # 创建输出目录
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        self.output_dir = os.path.join(config.output_dir, config.model.name, timestamp)
-        for subdir in ['model_checkpoints', 'confusion_matrices', 'loss_curves']:
-            os.makedirs(os.path.join(self.output_dir, subdir), exist_ok=True)
-        
-        # 创建所有必要的子目录
-        subdirs = [
-            'model_checkpoints',
-            'confusion_matrices',
-            'loss_curves'
-        ]
-        
-        for subdir in subdirs:
-            os.makedirs(os.path.join(self.output_dir, subdir), exist_ok=True)
-            logger.info(f"创建目录: {os.path.join(self.output_dir, subdir)}")
-        
+        # 使用传入的输出目录
+        self.output_dir = config.output_dir
+    
     def train_epoch(self, train_loader) -> Tuple[float, float]:
         """训练一个epoch"""
         self.model.train()
@@ -85,7 +80,7 @@ class Trainer:
         return total_loss/len(train_loader), 100.*correct/total
     
     @torch.no_grad()
-    def evaluate(self, val_loader) -> Tuple[float, float, np.ndarray]:
+    def evaluate(self, val_loader) -> Tuple[float, float, np.ndarray, float, float]:
         """评估模型"""
         self.model.eval()
         total_loss = 0
@@ -110,7 +105,16 @@ class Trainer:
         # 计算混淆矩阵
         cm = confusion_matrix(all_targets, all_preds)
         
-        return total_loss/len(val_loader), 100.*correct/total, cm
+        # 计算F1分数
+        f1 = f1_score(all_targets, all_preds, average='macro')
+        
+        # 计算Kappa系数
+        n_classes = len(np.unique(all_targets))
+        observed_accuracy = np.sum(np.diag(cm)) / np.sum(cm)
+        expected_accuracy = np.sum(np.sum(cm, axis=0) * np.sum(cm, axis=1)) / (np.sum(cm) ** 2)
+        kappa = (observed_accuracy - expected_accuracy) / (1 - expected_accuracy)
+        
+        return total_loss/len(val_loader), 100.*correct/total, cm, f1, kappa
     
     def train(self, train_loader, val_loader):
         """训练模型"""
@@ -127,7 +131,7 @@ class Trainer:
             train_loss, train_acc = self.train_epoch(train_loader)
             
             # 验证
-            val_loss, val_acc, cm = self.evaluate(val_loader)
+            val_loss, val_acc, cm, f1, kappa = self.evaluate(val_loader)
             
             # 更新学习率
             self.scheduler.step(val_acc)
@@ -137,12 +141,15 @@ class Trainer:
             self.history['val_loss'].append(val_loss)
             self.history['train_acc'].append(train_acc)
             self.history['val_acc'].append(val_acc)
+            self.history['val_f1'].append(f1)
+            self.history['val_kappa'].append(kappa)
             
             # 打印进度
             logger.info(
                 f'Epoch {actual_epochs}/{max_epochs}: '
                 f'Train Loss: {train_loss:.4f}, Train Acc: {train_acc:.2f}%, '
-                f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%'
+                f'Val Loss: {val_loss:.4f}, Val Acc: {val_acc:.2f}%, '
+                f'F1: {f1:.4f}, Kappa: {kappa:.4f}'
             )
             
             # 保存最佳模型
@@ -185,11 +192,11 @@ class Trainer:
         stage_names = ['Wake', 'N1', 'N2', 'N3', 'REM']
         sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
                     xticklabels=stage_names, yticklabels=stage_names)
-        plt.title(f'Confusion Matrix (Epoch {epoch+1})')
+        plt.title(f'{self.config.model.name.upper()} Model - Confusion Matrix (Epoch {epoch+1})')
         plt.xlabel('Predicted')
         plt.ylabel('True')
         # 保存图片
-        filename = 'best_confusion_matrix.png' if is_best else f'confusion_matrix_epoch_{epoch+1}.png'
+        filename = f'{self.config.model.name}_best_confusion_matrix.png' if is_best else f'{self.config.model.name}_confusion_matrix_epoch_{epoch+1}.png'
         plt.savefig(os.path.join(self.output_dir, 'confusion_matrices', filename))
         plt.close()
     
@@ -201,7 +208,7 @@ class Trainer:
         plt.subplot(1, 2, 1)
         plt.plot(self.history['train_loss'], label='Train Loss')
         plt.plot(self.history['val_loss'], label='Val Loss')
-        plt.title('Training and Validation Loss')
+        plt.title(f'{self.config.model.name.upper()} Model - Training and Validation Loss')
         plt.xlabel('Epoch')
         plt.ylabel('Loss')
         plt.legend()
@@ -210,13 +217,13 @@ class Trainer:
         plt.subplot(1, 2, 2)
         plt.plot(self.history['train_acc'], label='Train Acc')
         plt.plot(self.history['val_acc'], label='Val Acc')
-        plt.title('Training and Validation Accuracy')
+        plt.title(f'{self.config.model.name.upper()} Model - Training and Validation Accuracy')
         plt.xlabel('Epoch')
         plt.ylabel('Accuracy (%)')
         plt.legend()
         
         plt.tight_layout()
-        plt.savefig(os.path.join(self.output_dir, 'loss_curves', 'training_curves.png'))
+        plt.savefig(os.path.join(self.output_dir, 'loss_curves', f'{self.config.model.name}_training_curves.png'))
         plt.close()
     
     def save_checkpoint(self, epoch: int, is_best: bool = False):
@@ -230,17 +237,17 @@ class Trainer:
         }
         
         # 保存最新检查点
-        checkpoint_path = os.path.join(self.output_dir, 'model_checkpoints', 'checkpoint.pth')
+        checkpoint_path = os.path.join(self.output_dir, 'model_checkpoints', f'{self.config.model.name}_checkpoint.pth')
         torch.save(checkpoint, checkpoint_path)
         
         # 如果是最佳模型，额外保存一份
         if is_best:
-            best_path = os.path.join(self.output_dir, 'model_checkpoints', 'best_model.pth')
+            best_path = os.path.join(self.output_dir, 'model_checkpoints', f'{self.config.model.name}_best_model.pth')
             torch.save(checkpoint, best_path)
     
     def save_history(self):
         """保存训练历史"""
-        history_path = os.path.join(self.output_dir, 'history.json')
+        history_path = os.path.join(self.output_dir, f'{self.config.model.name}_history.json')
         with open(history_path, 'w') as f:
             json.dump(self.history, f, indent=4)
     

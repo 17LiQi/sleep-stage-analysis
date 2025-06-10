@@ -1,14 +1,19 @@
 import os
 import torch
 import logging
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset, ConcatDataset
 from utils.config import Config
 from models.sleep_net import SleepNet
 from models.cnn_model import CNNModel
 from models.lstm_model import LSTMModel
 from data.dataset import SleepDataset, SleepDataLoader
 from training.trainer import Trainer
+from training.smote_trainer import SMOTETrainer
 import json
+import numpy as np
+from sklearn.model_selection import KFold
+from typing import Dict, List, Tuple
+from datetime import datetime
 
 # 配置日志
 logging.basicConfig(
@@ -28,115 +33,153 @@ def get_model(model_name: str, config: Config):
     else:
         raise ValueError(f"未知的模型名称: {model_name}")
 
+def get_trainer(model_name: str, model, config: Config, use_smote: bool = False):
+    """根据配置创建训练器"""
+    if use_smote:
+        logger.info(f"使用SMOTE训练器训练模型: {model_name}")
+        return SMOTETrainer(model, config)
+    else:
+        logger.info(f"使用标准训练器训练模型: {model_name}")
+        return Trainer(model, config)
+
+def load_all_subjects_data(data_loader: SleepDataLoader, subject_ids: List[str]) -> Tuple[SleepDataset, Dict[str, int]]:
+    """加载所有受试者的数据并合并"""
+    all_segments = []
+    all_labels = []
+    
+    for subject_id in subject_ids:
+        logger.info(f"加载受试者 SC{subject_id} 的数据")
+        segments, labels = data_loader.load_subject_data(subject_id)
+        all_segments.extend(segments)
+        all_labels.extend(labels)
+    
+    return SleepDataset(all_segments, all_labels, augment=True), data_loader.label_mapping
+
 def main():
     # 要训练的模型列表
-    model_names = ['cnn', 'lstm', 'sleep_net']
+    # model_names = ['cnn', 'lstm', 'sleep_net']
+    model_names = ['sleep_net']
+
+    # # 受试者ID列表
+    # subject_ids = [
+    #     '4001', '4002', '4011', '4012', '4021', '4022', '4031', '4032',
+    #     '4041', '4042', '4051', '4052', '4061', '4062', '4071', '4072',
+    #     '4081', '4082', '4091', '4092'
+    # ]
+    # 受试者ID列表
+    subject_ids = [
+        '4001', '4002', '4011', '4012', '4021', '4022', '4031', '4032',
+        '4041', '4042', '4051', '4052'
+    ]
+    
+    # 是否使用SMOTE
+    use_smote = True
+    
+    # 加载配置
+    config = Config.get_default_config(model_names[0])
+    
+    # 设置随机种子
+    torch.manual_seed(config.seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(config.seed)
+    
+    # 创建数据加载器
+    data_loader = SleepDataLoader(config)
+    
+    # 加载所有受试者的数据
+    logger.info("开始加载所有受试者数据...")
+    full_dataset, label_mapping = load_all_subjects_data(data_loader, subject_ids)
+    
+    # 创建K折交叉验证
+    kfold = KFold(n_splits=config.data.n_splits, shuffle=True, random_state=config.seed)
     
     for model_name in model_names:
         logger.info(f"开始训练模型: {model_name}")
         
-        # 加载配置
+        # 更新模型配置
         config = Config.get_default_config(model_name)
         
-        # 设置随机种子
-        torch.manual_seed(config.seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(config.seed)
+        # 创建模型特定的输出目录
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        model_output_dir = os.path.join(config.output_dir, model_name, timestamp)
+        os.makedirs(model_output_dir, exist_ok=True)
         
-        # 创建数据加载器
-        data_loader = SleepDataLoader(config)
+        # 创建子目录
+        for subdir in ['model_checkpoints', 'confusion_matrices', 'loss_curves']:
+            os.makedirs(os.path.join(model_output_dir, subdir), exist_ok=True)
+            logger.info(f"创建目录: {os.path.join(model_output_dir, subdir)}")
         
-        # 加载所有受试者数据
-        all_segments = []
-        all_labels = []
+        # 更新配置中的输出目录
+        config.output_dir = model_output_dir
         
-        # 受试者ID列表
-        subject_ids = [
-            '4001', '4002', '4011', '4012', '4021', '4022', '4031', '4032',
-            '4041', '4042', '4051', '4052', '4061', '4062', '4071', '4072',
-            '4081', '4082', '4091', '4092'
-        ]
+        # 存储所有折的结果
+        all_fold_results = []
         
-        for subject_id in subject_ids:
-            try:
-                segments, labels = data_loader.load_subject_data(subject_id)
-                all_segments.append(segments)
-                all_labels.append(labels)
-                logger.info(f"成功加载受试者 SC{subject_id} 的数据")
-            except Exception as e:
-                logger.error(f"加载受试者 SC{subject_id} 数据时出错: {str(e)}")
+        # 对每一折进行训练和评估
+        for fold, (train_idx, val_idx) in enumerate(kfold.split(full_dataset)):
+            logger.info(f"开始第 {fold+1} 折训练")
+            
+            # 创建数据加载器
+            train_loader = DataLoader(
+                Subset(full_dataset, train_idx),
+                batch_size=config.training.batch_size,
+                shuffle=True,
+                num_workers=4,
+                pin_memory=True
+            )
+            
+            val_loader = DataLoader(
+                Subset(full_dataset, val_idx),
+                batch_size=config.training.batch_size,
+                shuffle=False,
+                num_workers=4,
+                pin_memory=True
+            )
+            
+            # 创建模型
+            model = get_model(model_name, config)
+            
+            # 创建训练器
+            trainer = get_trainer(model_name, model, config, use_smote)
+            
+            # 训练模型
+            history = trainer.train(train_loader, val_loader)
+            
+            # 记录结果
+            fold_result = {
+                'fold': fold + 1,
+                'best_val_acc': history['best_val_acc'],
+                'best_val_f1': max(history['val_f1']),
+                'best_val_kappa': max(history['val_kappa'])
+            }
+            all_fold_results.append(fold_result)
+            
+            # 清理显存
+            del model, trainer
+            torch.cuda.empty_cache()
         
-        if not all_segments:
-            logger.error("没有成功加载任何受试者数据，程序退出")
-            return
-        
-        # 合并所有数据
-        all_segments = torch.cat(all_segments, dim=0)
-        all_labels = torch.cat(all_labels, dim=0)
-        
-        # 创建数据集
-        dataset = SleepDataset(all_segments, all_labels, augment=True)
-        
-        # 划分数据集
-        total_size = len(dataset)
-        val_size = int(total_size * config.training.validation_split)
-        test_size = int(total_size * config.training.test_split)
-        train_size = total_size - val_size - test_size
-        
-        train_dataset, val_dataset, test_dataset = random_split(
-            dataset, [train_size, val_size, test_size]
-        )
-        
-        # 创建数据加载器
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=config.training.batch_size,
-            shuffle=True,
-            num_workers=4,
-            pin_memory=True
-        )
-        
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=config.training.batch_size,
-            shuffle=False,
-            num_workers=4,
-            pin_memory=True
-        )
-        
-        test_loader = DataLoader(
-            test_dataset,
-            batch_size=config.training.batch_size,
-            shuffle=False,
-            num_workers=4,
-            pin_memory=True
-        )
-        
-        # 创建模型
-        model = get_model(model_name, config)
-        
-        # 创建训练器
-        trainer = Trainer(model, config)
-        
-        # 训练模型
-        history = trainer.train(train_loader, val_loader)
-        
-        # 在测试集上评估
-        test_loss, test_acc, test_cm = trainer.evaluate(test_loader)
-        logger.info(f"测试集结果 - Loss: {test_loss:.4f}, Accuracy: {test_acc:.2f}%")
-        
-        # 保存最终结果
-        results = {
-            'test_loss': test_loss,
-            'test_acc': test_acc,
-            'best_val_acc': history['best_val_acc']
+        # 计算平均结果
+        overall_result = {
+            'model_name': model_name,
+            'use_smote': use_smote,
+            'mean_val_acc': np.mean([r['best_val_acc'] for r in all_fold_results]),
+            'mean_val_f1': np.mean([r['best_val_f1'] for r in all_fold_results]),
+            'mean_val_kappa': np.mean([r['best_val_kappa'] for r in all_fold_results]),
+            'fold_results': all_fold_results,
+            'label_mapping': label_mapping
         }
         
-        results_path = os.path.join(trainer.output_dir, 'results.json')
+        # 保存结果
+        results_path = os.path.join(model_output_dir, 'results.json')
         with open(results_path, 'w') as f:
-            json.dump(results, f, indent=4)
+            json.dump(overall_result, f, indent=4)
         
-        logger.info(f"模型 {model_name} 训练完成")
+        logger.info(
+            f"模型 {model_name} ({'SMOTE' if use_smote else '标准'}) 训练完成 - "
+            f"总体平均准确率: {overall_result['mean_val_acc']:.2f}%, "
+            f"总体平均F1: {overall_result['mean_val_f1']:.4f}, "
+            f"总体平均Kappa: {overall_result['mean_val_kappa']:.4f}"
+        )
 
 if __name__ == '__main__':
     main() 

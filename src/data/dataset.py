@@ -7,6 +7,9 @@ import logging
 import random
 import pandas as pd
 
+"""
+不使用滤波处理,验证模型鲁棒性
+"""
 logger = logging.getLogger(__name__)
 
 def parse_annotation(label_path, window_sec, sampling_rate, stage_mapping):
@@ -142,6 +145,7 @@ class SleepDataLoader:
     def __init__(self, config):
         self.config = config
         self.dataset_path = config.data.dataset_path
+        self.label_mapping = config.data.stage_mapping  # 添加标签映射属性
 
     def load_subject_data(self, subject_id: str) -> tuple:
         psg_file = os.path.join(
@@ -150,7 +154,7 @@ class SleepDataLoader:
         )
         logger.info(f"加载PSG文件: {psg_file}")
 
-        hypnogram_types = ['C', 'H', 'J']
+        hypnogram_types = ['C', 'H', 'J', 'P']
         hypnogram_file = None
         for hyp_type in hypnogram_types:
             temp_hyp_file = os.path.join(
