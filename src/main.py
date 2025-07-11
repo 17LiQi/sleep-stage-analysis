@@ -6,9 +6,11 @@ from utils.config import Config
 from models.sleep_net import SleepNet
 from models.cnn_model import CNNModel
 from models.lstm_model import LSTMModel
+from utils.wavelet_transform import WaveletCNN
 from data.dataset import SleepDataset, SleepDataLoader
 from training.trainer import Trainer
 from training.smote_trainer import SMOTETrainer
+from training.wavelet_trainer import WaveletTrainer
 import json
 import numpy as np
 from sklearn.model_selection import KFold
@@ -30,12 +32,22 @@ def get_model(model_name: str, config: Config):
         return LSTMModel(config)
     elif model_name == 'sleep_net':
         return SleepNet(config)
+    elif model_name == 'wavelet_cnn':
+        return WaveletCNN(config)
     else:
         raise ValueError(f"未知的模型名称: {model_name}")
 
-def get_trainer(model_name: str, model, config: Config, use_smote: bool = False):
+def get_trainer(model_name: str, model, config: Config, use_smote: bool = False, use_wavelet: bool = False):
     """根据配置创建训练器"""
-    if use_smote:
+    if use_wavelet:
+        logger.info(f"使用小波训练器训练模型: {model_name}")
+        wavelet_config = {
+            'wavelet': config.wavelet.wavelet,
+            'levels': config.wavelet.levels,
+            'focus_n1': config.wavelet.focus_n1
+        }
+        return WaveletTrainer(model, config, use_wavelet=True, wavelet_config=wavelet_config)
+    elif use_smote:
         logger.info(f"使用SMOTE训练器训练模型: {model_name}")
         return SMOTETrainer(model, config)
     else:
@@ -57,8 +69,8 @@ def load_all_subjects_data(data_loader: SleepDataLoader, subject_ids: List[str])
 
 def main():
     # 要训练的模型列表
-    # model_names = ['cnn', 'lstm', 'sleep_net']
-    model_names = ['sleep_net']
+    # model_names = ['cnn', 'lstm', 'sleep_net', 'wavelet_cnn']
+    model_names = ['cnn']
 
     # # 受试者ID列表
     # subject_ids = [
@@ -73,10 +85,17 @@ def main():
     ]
     
     # 是否使用SMOTE
-    use_smote = True
+    # use_smote = False
+    use_smote = False
     
+    # 是否使用小波变换
+    use_wavelet = True
+
     # 加载配置
-    config = Config.get_default_config(model_names[0])
+    if use_wavelet:
+        config = Config.get_wavelet_config(model_names[0], enable_wavelet=True)
+    else:
+        config = Config.get_default_config(model_names[0])
     
     # 设置随机种子
     torch.manual_seed(config.seed)
@@ -97,17 +116,15 @@ def main():
         logger.info(f"开始训练模型: {model_name}")
         
         # 更新模型配置
-        config = Config.get_default_config(model_name)
+        if use_wavelet:
+            config = Config.get_wavelet_config(model_name, enable_wavelet=True)
+        else:
+            config = Config.get_default_config(model_name)
         
         # 创建模型特定的输出目录
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
         model_output_dir = os.path.join(config.output_dir, model_name, timestamp)
         os.makedirs(model_output_dir, exist_ok=True)
-        
-        # 创建子目录
-        for subdir in ['model_checkpoints', 'confusion_matrices', 'loss_curves']:
-            os.makedirs(os.path.join(model_output_dir, subdir), exist_ok=True)
-            logger.info(f"创建目录: {os.path.join(model_output_dir, subdir)}")
         
         # 更新配置中的输出目录
         config.output_dir = model_output_dir
@@ -140,7 +157,7 @@ def main():
             model = get_model(model_name, config)
             
             # 创建训练器
-            trainer = get_trainer(model_name, model, config, use_smote)
+            trainer = get_trainer(model_name, model, config, use_smote, use_wavelet)
             
             # 训练模型
             history = trainer.train(train_loader, val_loader)
@@ -162,6 +179,8 @@ def main():
         overall_result = {
             'model_name': model_name,
             'use_smote': use_smote,
+            'use_wavelet': use_wavelet,
+            'wavelet_config': config.wavelet.__dict__ if use_wavelet else None,
             'mean_val_acc': np.mean([r['best_val_acc'] for r in all_fold_results]),
             'mean_val_f1': np.mean([r['best_val_f1'] for r in all_fold_results]),
             'mean_val_kappa': np.mean([r['best_val_kappa'] for r in all_fold_results]),
@@ -175,7 +194,7 @@ def main():
             json.dump(overall_result, f, indent=4)
         
         logger.info(
-            f"模型 {model_name} ({'SMOTE' if use_smote else '标准'}) 训练完成 - "
+            f"模型 {model_name} ({'小波+SMOTE' if use_wavelet and use_smote else '小波' if use_wavelet else 'SMOTE' if use_smote else '标准'}) 训练完成 - "
             f"总体平均准确率: {overall_result['mean_val_acc']:.2f}%, "
             f"总体平均F1: {overall_result['mean_val_f1']:.4f}, "
             f"总体平均Kappa: {overall_result['mean_val_kappa']:.4f}"

@@ -6,12 +6,12 @@ class LSTMModel(BaseModel):
     def __init__(self, config):
         super().__init__(config)
         
-        # 输入投影层
-        self.input_proj = nn.Linear(1, config.model.hidden_size)
+        # 输入投影层 - 修改输入维度为3000（30秒 * 100Hz）
+        self.input_proj = nn.Linear(config.model.input_size, config.model.hidden_size * 2)
         
         # LSTM层
         self.lstm = nn.LSTM(
-            input_size=config.model.hidden_size,
+            input_size=config.model.hidden_size * 2,
             hidden_size=config.model.hidden_size,
             num_layers=config.model.num_layers,
             batch_first=True,
@@ -67,5 +67,6 @@ class LSTMModel(BaseModel):
         
         return {
             'lstm_features': lstm_out,
-            'attention_weights': attention_weights
+            'attention_weights': attention_weights,
+            'context': torch.sum(attention_weights * lstm_out, dim=1)  # 添加上下文向量
         } 

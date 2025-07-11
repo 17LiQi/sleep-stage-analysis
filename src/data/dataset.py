@@ -148,34 +148,31 @@ class SleepDataLoader:
         self.label_mapping = config.data.stage_mapping  # 添加标签映射属性
 
     def load_subject_data(self, subject_id: str) -> tuple:
-        psg_file = os.path.join(
-            self.dataset_path,
-            self.config.data.psg_file_pattern.format(subject_id=subject_id)
-        )
-        logger.info(f"加载PSG文件: {psg_file}")
+        # 规范化 dataset_path，确保使用正斜杠
+        dataset_path = self.dataset_path.replace('\\', '/')
+        # 手动拼接路径，使用正斜杠
+        psg_file = f"{dataset_path}/SC{subject_id}E0-PSG.edf"
+        logger.info(f"加载PSG文件: {psg_file}, 存在: {os.path.exists(psg_file)}")
 
+        # Hypnogram 文件拼接
         hypnogram_types = ['C', 'H', 'J', 'P']
         hypnogram_file = None
         for hyp_type in hypnogram_types:
-            temp_hyp_file = os.path.join(
-                self.dataset_path,
-                self.config.data.hypnogram_file_pattern.format(
-                    subject_id=subject_id,
-                    type=hyp_type
-                )
-            )
+            # 同样使用正斜杠拼接 Hypnogram 文件路径
+            temp_hyp_file = f"{dataset_path}/SC{subject_id}E{hyp_type}-Hypnogram.edf"
             if os.path.exists(temp_hyp_file):
                 hypnogram_file = temp_hyp_file
                 logger.info(f"找到Hypnogram文件: {temp_hyp_file}")
                 break
 
         if not os.path.exists(psg_file):
-            logger.error(f"找不到PSG文件: {psg_file}")
-            raise FileNotFoundError(f"找不到PSG文件: {psg_file}")
+            logger.error(f"PSG文件不存在: {psg_file}")
+            raise FileNotFoundError(f"PSG文件不存在: {psg_file}")
         if not hypnogram_file:
-            logger.error(f"找不到Hypnogram文件: {subject_id}")
+            logger.error(f"找不到Hypnogram文件: {subject_id}, 尝试类型: {hypnogram_types}")
             raise FileNotFoundError(f"找不到Hypnogram文件: {subject_id}")
 
+        # 后续代码保持不变
         raw = mne.io.read_raw_edf(psg_file, preload=True)
         available_channels = raw.ch_names
         logger.info(f"可用通道: {available_channels}")

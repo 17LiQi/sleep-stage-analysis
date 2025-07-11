@@ -48,6 +48,23 @@ class Trainer:
         
         # 使用传入的输出目录
         self.output_dir = config.output_dir
+
+        # 创建所有必要的输出目录（只在初始化时调用一次）
+        self._create_output_directories()
+    
+    def _create_output_directories(self):
+        """创建所有必要的输出目录（只在初始化时调用一次）"""
+        directories = [
+            'confusion_matrices',
+            'loss_curves',
+            'model_checkpoints',
+            'logs',
+            'tsne'
+        ]
+        for dir_name in directories:
+            dir_path = os.path.join(self.output_dir, dir_name)
+            os.makedirs(dir_path, exist_ok=True)
+            logger.info(f"创建目录: {dir_path}")
     
     def train_epoch(self, train_loader) -> Tuple[float, float]:
         """训练一个epoch"""

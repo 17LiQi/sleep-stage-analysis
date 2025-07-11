@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ModelConfig:
-    name: str  # 'cnn', 'lstm', 'sleep_net'
+    name: str  # 'cnn', 'lstm', 'sleep_net', 'wavelet_cnn'
     input_size: int = 3000  # 30秒 * 100Hz
     hidden_size: int = 128
     num_layers: int = 2
@@ -20,6 +20,10 @@ class ModelConfig:
     
     # LSTM特定参数
     lstm_bidirectional: bool = True
+    
+    # 小波CNN特定参数
+    wavelet_levels: int = 5
+    wavelet_type: str = 'db4'
     
     def __post_init__(self):
         if self.cnn_channels is None:
@@ -34,13 +38,15 @@ class TrainingConfig:
     validation_split: float = 0.2
     test_split: float = 0.1
     early_stopping_patience: int = 5
+    epochs: int = 50  # 添加缺失的epochs属性
 
 @dataclass
 class DataConfig:
     target_channel: str = "EEG Fpz-Cz"
     window_sec: int = 30
     sampling_rate: int = 100
-    dataset_path: str = "/tmp/pycharm_project_506/physionet.org/files/sleep-edfx/1.0.0/sleep-cassette"
+    #dataset_path: str = "/tmp/pycharm_project_506/physionet.org/files/sleep-edfx/1.0.0/sleep-cassette"
+    dataset_path: str = "D:/85970/Files/ProgrammingFiles/GitProject/sleep-stage-analysis/physionet.org/files/sleep-edfx/1.0.0/sleep-cassette"
     num_subjects: int = 20
     
     # K折交叉验证参数
@@ -64,11 +70,32 @@ class DataConfig:
     )
 
 @dataclass
+class WaveletConfig:
+    """小波变换配置"""
+    enabled: bool = False
+    wavelet: str = 'db4'  # Daubechies 4小波基
+    levels: int = 5  # 分解层数
+    mode: str = 'symmetric'  # 边界处理模式
+    focus_n1: bool = True  # 是否针对N1阶段优化
+    # 频段定义
+    freq_bands: Dict[str, tuple] = field(
+        default_factory=lambda: {
+            'delta': (0.5, 4),    # 慢波睡眠
+            'theta': (4, 8),      # N1阶段特征
+            'alpha': (8, 14),     # 清醒状态
+            'beta': (14, 35),     # 快波
+            'gamma': (35, 100)    # 快波
+        }
+    )
+
+@dataclass
 class Config:
     model: ModelConfig
     training: TrainingConfig
     data: DataConfig
-    output_dir: str = "/tmp/pycharm_project_506/src/output_results"
+    wavelet: WaveletConfig = field(default_factory=WaveletConfig)
+    #output_dir: str = "/tmp/pycharm_project_506/src/output_results"
+    output_dir: str = "D:/85970/Files/ProgrammingFiles/GitProject/sleep-stage-analysis/src/output_results"
     device: str = "cuda"
     seed: int = 42
     
@@ -77,8 +104,12 @@ class Config:
         os.makedirs(self.output_dir, exist_ok=True)
         logger.info(f"创建主输出目录: {self.output_dir}")
         # 创建子目录
-        for subdir in ['confusion_matrices', 'loss_curves', 'model_checkpoints']:
+        for subdir in ['confusion_matrices', 'loss_curves', 'model_checkpoints', 'tsne']:
             os.makedirs(os.path.join(self.output_dir, subdir), exist_ok=True)
+        
+        # 如果启用小波变换，创建小波分析目录
+        if self.wavelet.enabled:
+            os.makedirs(os.path.join(self.output_dir, 'wavelet_analysis'), exist_ok=True)
         
     @classmethod
     def get_default_config(cls, model_name: str) -> 'Config':
@@ -86,5 +117,19 @@ class Config:
         return cls(
             model=model_config,
             training=TrainingConfig(),
-            data=DataConfig()
+            data=DataConfig(),
+            wavelet=WaveletConfig()
+        )
+    
+    @classmethod
+    def get_wavelet_config(cls, model_name: str, enable_wavelet: bool = True) -> 'Config':
+        """获取启用小波变换的配置"""
+        model_config = ModelConfig(name=model_name)
+        wavelet_config = WaveletConfig(enabled=enable_wavelet)
+        
+        return cls(
+            model=model_config,
+            training=TrainingConfig(),
+            data=DataConfig(),
+            wavelet=wavelet_config
         ) 
