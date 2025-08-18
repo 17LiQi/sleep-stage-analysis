@@ -1,0 +1,45 @@
+# configs/models/SimpleCNN.yaml
+
+# 继承基础配置 (seed, device, etc.)
+defaults:
+  - _self_
+  - ../base
+
+# 实验标识
+experiment_id: "SimpleCNN_Baseline"
+
+# 模型定义
+model:
+  name: "AttentionCNN"
+  params:
+    num_classes: 5
+
+# 训练超参数
+training:
+  epochs: 60
+  batch_size: 128
+
+  # 优化器
+  optimizer:
+    name: "AdamW" # AdamW 通常是一个比 Adam 更稳健的选择
+    params:
+      lr: 0.001
+      weight_decay: 0.01
+
+  # 学习率调度器
+  scheduler:
+    name: "StepLR"
+    params:
+      step_size: 20
+      gamma: 0.1
+
+  # 损失函数 (使用加权交叉熵来处理不平衡)
+  loss:
+    name: "CrossEntropyLoss"
+    # FocalLoss 的参数可以留空，脚本会自动选择CE Loss
+
+  # 早停
+  early_stopping:
+    patience: 10
+    monitor: "val_kappa"
+    mode: "max"

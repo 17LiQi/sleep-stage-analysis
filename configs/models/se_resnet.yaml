@@ -1,0 +1,36 @@
+# configs/models/se_resnet.yaml
+defaults:
+  - _self_
+  - ../base
+
+experiment_id: "SE_ResNet_SupervisedAttention"
+
+model:
+  name: "SEResNet"
+  params:
+    num_classes: 5
+
+training:
+  # 推荐使用 FocalLoss 来最大化监督注意力的效果
+  loss:
+    name: "FocalLoss"
+    params:
+      gamma: 2.0
+  # 其他超参数可以参考我们ResNet的成功配置
+  epochs: 80
+  batch_size: 128
+  optimizer:
+    name: "AdamW"
+    params:
+      lr: 0.001
+      weight_decay: 0.01
+  scheduler:
+    name: "CosineAnnealingLR"
+    params:
+      T_max: 80
+      eta_min: 0.000001
+
+  early_stopping:
+    patience: 15 # 给予更复杂的模型更多的耐心
+    monitor: "val_kappa"
+    mode: "max"

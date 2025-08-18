@@ -1,0 +1,17 @@
+# configs/models/Attn_CNN_GRU.yaml
+
+# 继承自基础的CNN_GRU配置
+defaults:
+  - _self_
+  - CNN_GRU
+
+# 实验标识
+experiment_id: "Attn_CNN_GRU_Enhanced"
+
+# 模型定义
+model:
+  # 仍然使用AttentionCNNGRU这个类
+  name: "AttentionCNNGRU"
+  params:
+    # 新增一个参数来激活注意力模块
+    use_attention: true

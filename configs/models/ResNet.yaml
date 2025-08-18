@@ -1,0 +1,44 @@
+# 继承基础配置
+defaults:
+  - _self_
+  - ../base
+
+# 实验标识
+experiment_id: "ResNet"
+
+# 模型定义
+model:
+  name: "AttentionResNet"
+  params:
+    num_classes: 5
+
+# 预训练配置
+pretrain:
+  # 相对于项目根目录的路径
+  encoder_path: "pretrained_weights/ts2vec_encoder_best.pth"
+  freeze_encoder: false # 解冻并微调
+
+# 训练超参数
+training:
+  epochs: 80
+  batch_size: 128
+
+  optimizer:
+    name: "AdamW"
+    params:
+      lr: 0.0005
+    # 差分学习率
+    encoder_lr: 0.00001
+
+  scheduler:
+    name: "CosineAnnealingLR"
+    params:
+      T_max: 80
+
+  loss:
+    name: "CrossEntropyLoss"
+  # 早停
+  early_stopping:
+    patience: 15 # 给予更复杂的模型更多的耐心
+    monitor: "val_kappa"
+    mode: "max"

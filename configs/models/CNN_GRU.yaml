@@ -1,0 +1,46 @@
+# configs/models/CNN_GRU.yaml
+
+# 继承基础配置
+defaults:
+  - _self_
+  - ../base
+
+# 实验标识
+experiment_id: "CNN_GRU_Baseline"
+
+# 模型定义
+model:
+  name: "AttentionCNNGRU"
+  params:
+    num_classes: 5
+    gru_hidden_size: 128
+    gru_num_layers: 2
+
+# 训练超参数
+training:
+  epochs: 80 # RNN/GRU 模型通常需要更多时间来收敛
+  batch_size: 128
+
+  # 优化器
+  optimizer:
+    name: "AdamW"
+    params:
+      lr: 0.0005 # RNN/GRU 对学习率更敏感，使用一个稍小的值
+      weight_decay: 0.01
+
+  # 学习率调度器
+  scheduler:
+    name: "CosineAnnealingLR" # 余弦退火通常在RNN上表现更好
+    params:
+      T_max: 80 # T_max 应该等于总的epoch数
+      eta_min: 0.000001
+
+  # 损失函数
+  loss:
+    name: "CrossEntropyLoss"
+
+  # 早停
+  early_stopping:
+    patience: 15 # 给予更复杂的模型更多的耐心
+    monitor: "val_kappa"
+    mode: "max"

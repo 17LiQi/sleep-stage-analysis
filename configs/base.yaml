@@ -1,0 +1,20 @@
+# 全局配置
+seed: 42
+device: "cuda"
+
+# 数据集配置
+data:
+  channel: "EEG_Fpz_Cz"
+  n_splits_cv: 5 # 交叉验证折数
+
+# Viterbi 配置
+viterbi:
+  enabled: true
+
+# 路径 (可以留空, 让path_manager填充, 或提供默认值)
+paths:
+  data_root: "./data"
+  output_root: "./outputs"
+
+model:
+    class_names: ["W", "N1", "N2", "N3/4", "REM"]

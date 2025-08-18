@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="Encoding">
+    <file url="file://$PROJECT_DIR$/../SSCov/configs/experiments/model_zoo/simple_cnn.yaml" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/../SSCov/data/preprocess.log" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/data/preprocess_split.log" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/output/Ablation_V2_AttentionResNet_NoPretrain_HMM/20250810171920/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/output/Final_SeqToSeq_CNN_BiGRU/20250813200934/fold_5/evaluation_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/output/Final_SeqToSeq_CNN_BiGRU/20250813213202/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/output/V2_AttentionResNet_TS2Vec_HMM/20250807111137/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/ModelSelection_BiGRU/20250808102259/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/ModelSelection_CNN_GRU/20250808101916/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/ModelSelection_SimpleCNN/20250806201213/summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/ModelSelection_SimpleCNN/20250808101612/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V2_FocalLoss_DiffLR/20250808083806/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V3.1_ResNet18_Balanced/20250809111236/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V3_EfficientNetB0_MelSpec/20250807161204/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V3_Pro_BalancedSampling/20250809123744/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V4_MultiScale_CNN_GRU/20250808161439/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V4_MultiScale_CNN_GRU/20250808164009/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V4_Pro_ResNet_BiGRU_Gated/20250808170625/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V4_Pro_With_TS2Vec_Pretrain/20250808205431/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V6_MSHDAB_Implementation/20250809203027/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/V6_MSHDAB_Implementation/20250809205809/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/../SSCov/src/output/v3_mobilenet_v2/20250809144608/cv_summary_report.txt" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/data/preprocess_1d_split.log" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/n1_training_20250713_215731.log" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/n1_training_20250713_215852.log" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/n1_training_20250714_144203.log" charset="GBK" />
+    <file url="file://$PROJECT_DIR$/n1_training_20250714_153519.log" charset="GBK" />
     <file url="file://$PROJECT_DIR$/tag/ST7011J0-PSG_labels.txt" charset="GBK" />
   </component>
 </project>

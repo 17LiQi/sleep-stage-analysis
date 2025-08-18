@@ -1,0 +1,13 @@
+# configs/models/Attn_SimpleCNN.yaml
+defaults:
+  - _self_
+  - SimpleCNN # 继承自基础的SimpleCNN配置
+
+experiment_id: "Attn_SimpleCNN_Enhanced"
+
+model:
+  # 仍然使用AttentionCNN这个类
+  name: "AttentionCNN"
+  params:
+    # 激活它的注意力模块
+    use_attention: true

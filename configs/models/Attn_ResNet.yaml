@@ -1,0 +1,14 @@
+# 继承基础配置
+defaults:
+  - _self_
+  - ResNet
+
+# 实验标识
+experiment_id: "Attn_ResNet"
+
+# 模型定义
+model:
+  name: "AttentionResNet"
+  params:
+    # 激活它的注意力模块
+    use_attention: true

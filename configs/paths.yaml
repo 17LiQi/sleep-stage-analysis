@@ -1,0 +1,22 @@
+# 项目根目录配置
+project_root: "."  # 当前目录
+
+# 配置文件目录配置
+config_dir:
+    name: "configs"
+
+# 源代码目录配置
+src_dir:
+  name: "src"
+
+# 预处理数据目录配置
+data_dir:
+  name: "data"
+
+# 输出目录配置
+output_dir:
+  name: "output"
+
+# 原始数据目录配置
+sleep_edf_dir:
+  name: "physionet.org"

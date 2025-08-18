@@ -1,0 +1,23 @@
+# requirements.txt
+# 基础库
+numpy>=1.26,<2.0 # 1.26.4
+pandas # 2.3.1
+matplotlib # 3.10.3
+tqdm # 4.67.1
+scikit-learn # 1.7.1
+seaborn # 0.13.2
+pyedflib # 0.1.42
+
+# 核心库
+# PyTorch with CUDA 12.1 support
+https://mirrors.aliyun.com/pytorch-wheels/cu121/torch-2.4.0+cu121-cp310-cp310-win_amd64.whl
+https://mirrors.aliyun.com/pytorch-wheels/cu121/torchvision-0.16.1+cu121-cp310-cp310-win_amd64.whl
+
+# 专业库
+mne # 1.10.0
+librosa # 0.11.0
+xgboost # 3.0.4
+
+# 配置库
+PyYAML # 6.0.2
+OmegaConf # 2.3.0

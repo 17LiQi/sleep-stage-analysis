@@ -1,8 +1,6 @@
 /physionet.org/
-/Hypnogram/
-/PSG/
-/tag/
-/processed_eeg_data/
-/code/void/
 /temp/
-/src/output_results/
+/.idea/
+/data/
+/output/
+*.pyc
